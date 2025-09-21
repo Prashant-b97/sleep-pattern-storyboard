@@ -13,8 +13,13 @@ __pycache__/
 # Analysis artefacts
 analysis_output/
 
-# Data exports (keep originals out of version control)
+# Data folders
+data/processed/
+!data/processed/.gitkeep
+
+# Ignore stray CSVs but keep sample raw data
 *.csv
+!data/raw/*.csv
 
 # Streamlit static files
 .streamlit/

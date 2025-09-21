@@ -44,10 +44,14 @@ class RunConfig:
 
 def parse_args(args: Optional[list[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Explore sleep patterns from CSV exports.")
-    parser.add_argument("--primary", default="sleep_data.csv", help="Daily summary CSV path")
+    parser.add_argument(
+        "--primary",
+        default="data/raw/sleep_data.csv",
+        help="Daily summary CSV path",
+    )
     parser.add_argument(
         "--secondary",
-        default="sleep_data_new.csv",
+        default="data/raw/sleep_data_new.csv",
         help="Event-level CSV path (set --skip-secondary to ignore)",
     )
     parser.add_argument(

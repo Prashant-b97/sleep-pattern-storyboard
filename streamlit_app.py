@@ -33,8 +33,8 @@ def read_secondary(path: Path) -> pd.DataFrame:
 
 def parse_known_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(add_help=False)
-    parser.add_argument("--primary", default="sleep_data.csv")
-    parser.add_argument("--secondary", default="sleep_data_new.csv")
+    parser.add_argument("--primary", default="data/raw/sleep_data.csv")
+    parser.add_argument("--secondary", default="data/raw/sleep_data_new.csv")
     parser.add_argument("--lags", type=int, default=30)
     parser.add_argument("--forecast-horizon", type=int, default=14)
     args, _ = parser.parse_known_args()

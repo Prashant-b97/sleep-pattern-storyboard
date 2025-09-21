@@ -44,6 +44,7 @@ This repository documents the journey—from raw exports to repeatable workflows
 - Generates **charts, tables, forecasts,** and a plain-English `run_summary.txt`.  
 - Uses **seasonal decomposition + AutoReg forecasting** to detect volatility or drift.  
 - Handles **secondary session data** (start/end times, devices) for richer context.  
+- Ships with sample tracker exports under `data/raw/` so you can run the story end-to-end instantly.  
 
 ### Quickstart  
 
@@ -55,7 +56,7 @@ conda activate sleep-analysis
 # Install in dev mode
 pip install -e '.[dev]'
 
-# Run analysis
+# Run analysis (defaults target data/raw/)
 sleep-analysis --output-dir analysis_output --run-id first_story --lags 21 --forecast-horizon 14
 ```
 
@@ -66,7 +67,7 @@ sleep-analysis --output-dir analysis_output --run-id first_story --lags 21 --for
 Run the interactive app:  
 
 ```bash
-streamlit run streamlit_app.py -- --primary sleep_data.csv --secondary sleep_data_new.csv
+streamlit run streamlit_app.py -- --primary data/raw/sleep_data.csv --secondary data/raw/sleep_data_new.csv
 ```
 
 ### Features:
@@ -93,21 +94,27 @@ streamlit run streamlit_app.py -- --primary sleep_data.csv --secondary sleep_dat
 ## 🗂️ Repository Map
 ```
 .
-├── pyproject.toml
 ├── README.md
-├── streamlit_app.py                # Interactive dashboard
-├── sleep_pattern_analysis.py       # CLI entry (legacy support)
+├── pyproject.toml
+├── data/
+│   ├── raw/
+│   │   ├── sleep_data.csv
+│   │   └── sleep_data_new.csv
+│   └── processed/
+│       └── .gitkeep
+├── docs/
+│   ├── findings.md                 # Insight documentation
+│   └── assets/                     # Screenshots & GIFs
+├── notebooks/
+│   └── Sleep Pattern Analysis.ipynb
 ├── src/
 │   └── sleep_analysis/
 │       ├── __init__.py
 │       └── cli.py                  # Core CLI logic
-├── tests/
-│   └── test_loaders.py             # Loader unit tests
-├── docs/
-│   ├── findings.md                 # Insight documentation
-│   └── assets/                     # Screenshots & GIFs
-├── sleep_data.csv
-└── sleep_data_new.csv
+├── streamlit_app.py                # Interactive dashboard
+├── sleep_pattern_analysis.py       # CLI entry (legacy support)
+└── tests/
+    └── test_loaders.py             # Loader unit tests
 ```
 
 ---
