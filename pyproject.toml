@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sleep-analysis"
+version = "0.1.0"
+description = "CLI toolkit for exploring and forecasting personal sleep patterns"
+authors = [{ name = "Prashant Bhardwaj" }]
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "matplotlib>=3.8",
+    "pandas>=2.0",
+    "seaborn>=0.12",
+    "statsmodels>=0.14",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.5",
+]
+
+[project.scripts]
+sleep-analysis = "sleep_analysis.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
