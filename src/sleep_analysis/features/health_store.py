@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 import json
 from pathlib import Path
-from typing import Optional
+from typing import Iterable, Optional
 
 import pandas as pd
 
@@ -15,6 +15,7 @@ from ..signals import (
     load_step_signals,
     load_tags,
 )
+from ..privacy.scrub import ensure_local_path, scrub_dataframe, DEFAULT_SALT_ENV
 from ..personalize.baselines import compute_baselines
 
 
@@ -40,6 +41,9 @@ def build_health_feature_store(
     tags_path: Optional[Path] = None,
     screen_time_path: Optional[Path] = None,
     output_dir: Path,
+    scrub_fields: Optional[Iterable[str]] = None,
+    local_only: bool = False,
+    salt_env: str = DEFAULT_SALT_ENV,
 ) -> Path:
     """Join sleep dataset with optional health signals and persist parquet output."""
 
@@ -76,9 +80,15 @@ def build_health_feature_store(
         ],
     )
 
+    if local_only:
+        ensure_local_path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     run_ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H%M%SZ")
     feature_path = output_dir / f"health_features_{run_ts}.parquet"
+
+    if scrub_fields:
+        merged = scrub_dataframe(merged, fields=scrub_fields, salt_env=salt_env)
+
     merged.to_parquet(feature_path, index=False)
 
     schema_doc = {

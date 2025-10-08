@@ -28,13 +28,18 @@ except ImportError:  # pragma: no cover
     AutoReg = None
     seasonal_decompose = None
 
+from .config import load_settings
 from .parsers import parse_apple_health, parse_fitbit, parse_oura
 from .transform import normalize, validate_records, write_curated_dataset
 from .training import run_training
 from .features.health_store import build_health_feature_store
 from .telemetry import log_run
+from .privacy.scrub import scrub_dataframe, ensure_local_path, DEFAULT_SALT_ENV
+from .reporting.pdf import generate_weekly_pdf
 
 sns.set_theme(style="whitegrid")
+
+SETTINGS = load_settings()
 
 
 @dataclass
@@ -50,7 +55,7 @@ class RunConfig:
     seasonal_period: int
 
 
-COMMAND_ALIASES = {"analyze", "ingest", "train", "build-features"}
+COMMAND_ALIASES = {"analyze", "ingest", "train", "build-features", "export-report"}
 
 
 def _configure_analyze_parser(parser: argparse.ArgumentParser) -> None:
@@ -134,6 +139,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Directory where curated parquet partitions are written",
     )
     ingest_parser.add_argument(
+        "--privacy",
+        choices=["local-only"],
+        default=None,
+        help="Enable additional privacy safeguards for this run",
+    )
+    ingest_parser.add_argument(
         "--verbose",
         action="store_true",
         help="Enable debug logging for ingest",
@@ -165,11 +176,34 @@ def build_parser() -> argparse.ArgumentParser:
         help="Directory where feature store parquet files are written",
     )
     features_parser.add_argument(
+        "--privacy",
+        choices=["local-only"],
+        default=None,
+        help="Enable additional privacy safeguards for this run",
+    )
+    features_parser.add_argument(
         "--verbose",
         action="store_true",
         help="Enable verbose logging for feature building",
     )
     features_parser.set_defaults(command="build-features")
+
+    export_parser = subparsers.add_parser(
+        "export-report",
+        help="Generate a weekly PDF report from analysis outputs",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    export_parser.add_argument(
+        "--week",
+        default=None,
+        help="ISO week (YYYY-Www) to render. Defaults to latest available week.",
+    )
+    export_parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Enable verbose logging for report export",
+    )
+    export_parser.set_defaults(command="export-report")
 
     train_parser = subparsers.add_parser(
         "train",
@@ -599,14 +633,25 @@ def run_ingest(args: argparse.Namespace) -> Path:
         logging.warning("No rows detected in input %s", args.path)
     normalized = normalize(raw_df)
     validate_records(normalized)
-    result = write_curated_dataset(normalized, Path(args.out))
+    privacy_mode = args.privacy or ("local-only" if SETTINGS.privacy_local_only else None)
+    scrub_fields = SETTINGS.get("privacy", "scrub_fields", default=[])
+    salt_env = SETTINGS.get("privacy", "hash_salt_env", default=DEFAULT_SALT_ENV)
+    out_dir = Path(args.out)
+    if privacy_mode == "local-only":
+        out_dir = Path(ensure_local_path(out_dir))
+        normalized = scrub_dataframe(normalized, fields=scrub_fields, salt_env=salt_env)
+    result = write_curated_dataset(normalized, out_dir)
     logging.info("Wrote %d rows to %s", len(normalized), result.out_path)
     logging.info("Version pointer updated at %s", result.version_pointer)
     log_run(
         "ingest",
         start_time=start,
         rows_processed=len(normalized),
-        metadata={"source": args.source, "output": str(result.out_path)},
+        metadata={
+            "source": args.source,
+            "output": str(result.out_path),
+            "privacy": privacy_mode or ("local-only" if SETTINGS.privacy_local_only else "default"),
+        },
     )
     return result.out_path
 
@@ -616,6 +661,11 @@ def run_build_features(args: argparse.Namespace) -> Path:
     start = time.time()
     parquet_dir = Path(args.parquet_dir)
     output_dir = Path(args.out)
+    privacy_mode = args.privacy or ("local-only" if SETTINGS.privacy_local_only else None)
+    scrub_fields = SETTINGS.get("privacy", "scrub_fields", default=[])
+    salt_env = SETTINGS.get("privacy", "hash_salt_env", default=DEFAULT_SALT_ENV)
+    if privacy_mode == "local-only":
+        output_dir = Path(ensure_local_path(output_dir))
     feature_path = build_health_feature_store(
         parquet_dir,
         hrv_path=Path(args.hrv) if args.hrv else None,
@@ -623,6 +673,9 @@ def run_build_features(args: argparse.Namespace) -> Path:
         tags_path=Path(args.tags) if args.tags else None,
         screen_time_path=Path(args.screen_time) if args.screen_time else None,
         output_dir=output_dir,
+        scrub_fields=scrub_fields if privacy_mode == "local-only" else None,
+        local_only=privacy_mode == "local-only",
+        salt_env=salt_env,
     )
     logging.info("Feature store written to %s", feature_path)
     schema_doc = output_dir / "SCHEMA.json"
@@ -644,6 +697,7 @@ def run_build_features(args: argparse.Namespace) -> Path:
             "steps": args.steps,
             "tags": args.tags,
             "screen_time": args.screen_time,
+            "privacy": privacy_mode or ("local-only" if SETTINGS.privacy_local_only else "default"),
         },
     )
     return feature_path
@@ -677,6 +731,22 @@ def run_train(args: argparse.Namespace) -> Path:
     return Path(args.output_dir or ".")
 
 
+def run_export_report(args: argparse.Namespace) -> Path:
+    configure_logging(args.verbose)
+    start = time.time()
+    reports_dir = Path(SETTINGS.get("app", "model_reports_dir", default="analysis_output/model_reports"))
+    reports_dir.mkdir(parents=True, exist_ok=True)
+    pdf_dir = SETTINGS.reports_output_dir
+    pdf_dir.mkdir(parents=True, exist_ok=True)
+    pdf_path = generate_weekly_pdf(reports_dir, pdf_dir, week=args.week)
+    log_run(
+        "export_report",
+        start_time=start,
+        metadata={"week": args.week or "latest", "path": str(pdf_path)},
+    )
+    return pdf_path
+
+
 def main(args: Optional[list[str]] = None) -> Path:
     namespace = parse_args(args=args)
     if namespace.command == "ingest":
@@ -685,6 +755,8 @@ def main(args: Optional[list[str]] = None) -> Path:
         return run_train(namespace)
     if namespace.command == "build-features":
         return run_build_features(namespace)
+    if namespace.command == "export-report":
+        return run_export_report(namespace)
     return run_analysis(namespace)
 
 

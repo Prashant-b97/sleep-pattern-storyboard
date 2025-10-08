@@ -20,6 +20,8 @@ dependencies = [
     "backports.zoneinfo>=0.2.1; python_version<'3.9'",
     "PyYAML>=6.0",
     "scikit-learn>=1.2",
+    "streamlit>=1.29",
+    "reportlab>=3.6",
 ]
 
 [project.optional-dependencies]

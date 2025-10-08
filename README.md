@@ -37,6 +37,30 @@ pip install -e '.[dev]'
 sleep-analysis --output-dir analysis_output --run-id first_story --lags 21 --forecast-horizon 14
 ```
 
+### Run the App
+
+```bash
+streamlit run app/Home.py
+```
+
+Navigate via the sidebar to switch between Home, Analyst, Trends, Coach, and What-if experiences.
+
+### Export Weekly PDF
+
+```bash
+python -m sleep_analysis.cli export-report --week 2025-W40
+```
+
+The PDF lands in `analysis_output/reports/` (also available via the Analyst Streamlit page).
+
+### Privacy Mode
+
+```bash
+python -m sleep_analysis.cli ingest --source oura --path data/raw/vendor_samples/oura.csv --out data/processed/parquet --privacy local-only
+```
+
+`local-only` enforces on-disk writes inside the repo and hashes name/email/id columns using the salt defined in `config/settings.yaml` (overridable with `SPS_` environment variables).
+
 ### Dashboard Preview
 
 <p align="center">
@@ -100,25 +124,30 @@ Act III pushes the project into production-grade stewardship. The emphasis is on
 .
 ├── README.md
 ├── pyproject.toml
-├── data/
-│   ├── raw/
-│   │   ├── sleep_data.csv
-│   │   └── sleep_data_new.csv
-│   └── processed/
-│       └── .gitkeep
-├── docs/
-│   ├── findings.md                 # Insight documentation
-│   └── assets/                     # Screenshots & GIFs
-├── notebooks/
-│   └── Sleep Pattern Analysis.ipynb
+├── app/
+│   ├── Home.py                     # Multipage Streamlit entrypoint
+│   ├── Analyst.py
+│   ├── Trends.py
+│   ├── Coach.py
+│   ├── WhatIf.py
+│   └── components/
+├── config/settings.yaml            # YAML settings (privacy, exports, weekend definition)
 ├── src/
 │   └── sleep_analysis/
-│       ├── __init__.py
-│       └── cli.py                  # Core CLI logic
-├── streamlit_app.py                # Interactive dashboard
-├── sleep_pattern_analysis.py       # CLI entry (legacy support)
-└── tests/
-    └── test_loaders.py             # Loader unit tests
+│       ├── cli.py
+│       ├── config.py
+│       ├── privacy/
+│       ├── reporting/
+│       └── features/
+├── analysis_output/                # Generated artefacts (reports, exports, telemetry)
+├── data/
+│   ├── raw/
+│   │   ├── vendor_samples/
+│   │   └── signals/
+│   └── processed/                  # Curated parquet outputs
+├── LICENSE
+├── CONTRIBUTING.md
+└── tests/                          # Unit/property tests (ingest, analytics, privacy, exports)
 ```
 
 Sleep Pattern Storyboard now tells a three-act story: Act I proved the cleaning and storytelling core, Act II layers on advanced intelligence across data, models, health context, and causal reasoning, and Act III hardens the product for teams through polish, operations, privacy, and narrative AI. Each stage makes the repo more recruiter-ready and positions it as a living portfolio piece that keeps evolving with every nightly upload.

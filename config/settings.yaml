@@ -1,0 +1,22 @@
+privacy:
+  local_only: false
+  scrub_fields: ["name", "email", "id"]
+  hash_salt_env: "SPS_SALT"
+
+reports:
+  enabled: true
+  output_dir: "analysis_output/reports"
+
+exports:
+  output_dir: "analysis_output/exports"
+  formats: ["csv", "parquet"]
+
+analysis:
+  outlier_bounds:
+    duration_min: [120, 720]
+  weekend_days: [5, 6]
+
+app:
+  default_parquet_dir: "data/processed/parquet"
+  model_reports_dir: "analysis_output/model_reports"
+  features_path: "data/processed/features"
