@@ -35,3 +35,6 @@ sleep-analysis = "sleep_analysis.cli:main"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+
+[tool.ruff]
+exclude = ["build", "notebooks"]

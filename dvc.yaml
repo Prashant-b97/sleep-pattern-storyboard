@@ -1,0 +1,46 @@
+stages:
+  ingest:
+    cmd: python -m sleep_analysis.cli ingest --source oura --path data/raw/vendor_samples/oura.csv --out data/processed/parquet
+    deps:
+      - data/raw/vendor_samples/oura.csv
+      - src/sleep_analysis/cli.py
+      - src/sleep_analysis/parsers/oura.py
+      - src/sleep_analysis/parsers/fitbit.py
+      - src/sleep_analysis/parsers/apple_health.py
+      - src/sleep_analysis/parsers/base.py
+      - src/sleep_analysis/transform.py
+    outs:
+      - data/processed/parquet:
+          persist: true
+  build_features:
+    cmd: python -m sleep_analysis.cli build-features --parquet-dir data/processed/parquet --hrv data/raw/signals/hrv_sample.csv --steps data/raw/signals/steps_sample.csv --tags data/raw/signals/tags_sample.csv --screen-time data/raw/signals/screen_time_sample.csv --out data/processed/features
+    deps:
+      - data/raw/signals/hrv_sample.csv
+      - data/raw/signals/steps_sample.csv
+      - data/raw/signals/tags_sample.csv
+      - data/raw/signals/screen_time_sample.csv
+      - src/sleep_analysis/features/health_store.py
+      - src/sleep_analysis/personalize/baselines.py
+      - src/sleep_analysis/signals/hrv.py
+      - src/sleep_analysis/signals/steps.py
+      - src/sleep_analysis/signals/tags.py
+      - src/sleep_analysis/signals/screen_time_proxy.py
+      - data/processed/parquet
+    outs:
+      - data/processed/features:
+          persist: true
+  train:
+    cmd: python -m sleep_analysis.cli train --config configs/analytics_v2.yaml
+    deps:
+      - configs/analytics_v2.yaml
+      - src/sleep_analysis/training.py
+      - src/sleep_analysis/models/sarimax.py
+      - src/sleep_analysis/models/prophet.py
+      - src/sleep_analysis/models/gbm.py
+      - src/sleep_analysis/models/tft.py
+      - src/sleep_analysis/models/artifacts.py
+      - src/sleep_analysis/features/circadian.py
+      - data/processed/features
+    outs:
+      - analysis_output/model_reports:
+          persist: true

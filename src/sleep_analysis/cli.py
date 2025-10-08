@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -31,6 +32,7 @@ from .parsers import parse_apple_health, parse_fitbit, parse_oura
 from .transform import normalize, validate_records, write_curated_dataset
 from .training import run_training
 from .features.health_store import build_health_feature_store
+from .telemetry import log_run
 
 sns.set_theme(style="whitegrid")
 
@@ -584,6 +586,7 @@ def run_analysis(args: argparse.Namespace) -> Path:
 
 def run_ingest(args: argparse.Namespace) -> Path:
     configure_logging(args.verbose)
+    start = time.time()
     parser_map = {
         "oura": parse_oura,
         "fitbit": parse_fitbit,
@@ -599,11 +602,18 @@ def run_ingest(args: argparse.Namespace) -> Path:
     result = write_curated_dataset(normalized, Path(args.out))
     logging.info("Wrote %d rows to %s", len(normalized), result.out_path)
     logging.info("Version pointer updated at %s", result.version_pointer)
+    log_run(
+        "ingest",
+        start_time=start,
+        rows_processed=len(normalized),
+        metadata={"source": args.source, "output": str(result.out_path)},
+    )
     return result.out_path
 
 
 def run_build_features(args: argparse.Namespace) -> Path:
     configure_logging(args.verbose)
+    start = time.time()
     parquet_dir = Path(args.parquet_dir)
     output_dir = Path(args.out)
     feature_path = build_health_feature_store(
@@ -615,19 +625,55 @@ def run_build_features(args: argparse.Namespace) -> Path:
         output_dir=output_dir,
     )
     logging.info("Feature store written to %s", feature_path)
+    schema_doc = output_dir / "SCHEMA.json"
+    rows = 0
+    if schema_doc.exists():
+        try:
+            import json
+
+            rows = json.loads(schema_doc.read_text()).get("rows", 0)
+        except Exception:  # pragma: no cover - telemetry best-effort
+            rows = 0
+    log_run(
+        "build_features",
+        start_time=start,
+        rows_processed=int(rows),
+        metadata={
+            "output": str(feature_path),
+            "hrv": args.hrv,
+            "steps": args.steps,
+            "tags": args.tags,
+            "screen_time": args.screen_time,
+        },
+    )
     return feature_path
 
 
 def run_train(args: argparse.Namespace) -> Path:
     configure_logging(args.verbose)
+    start = time.time()
     config_path = Path(args.config)
     output_override = Path(args.output_dir) if args.output_dir else None
     artifacts = run_training(config_path, output_dir_override=output_override)
     if artifacts:
         summary_dir = Path(args.output_dir) if args.output_dir else Path(artifacts[0].forecast_path).parent
         logging.info("Training completed, produced %d artefacts.", len(artifacts))
+        rows = sum(len(artifact.forecast) for artifact in artifacts if artifact.forecast is not None)
+        log_run(
+            "train",
+            start_time=start,
+            rows_processed=int(rows),
+            metadata={"artifacts": len(artifacts), "config": str(config_path)},
+        )
         return summary_dir
     logging.warning("No artefacts generated during training run.")
+    log_run(
+        "train",
+        start_time=start,
+        status="error",
+        error="no artifacts",
+        metadata={"config": str(config_path)},
+    )
     return Path(args.output_dir or ".")
 
 

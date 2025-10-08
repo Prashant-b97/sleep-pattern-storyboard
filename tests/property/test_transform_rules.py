@@ -7,7 +7,6 @@ try:
 except ImportError:  # pragma: no cover - Python 3.8 fallback
     from backports.zoneinfo import ZoneInfo  # type: ignore
 
-import numpy as np
 import pandas as pd
 from hypothesis import given, settings, strategies as st
 

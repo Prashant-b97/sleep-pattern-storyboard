@@ -50,7 +50,6 @@ def highlight_metrics(df: pd.DataFrame, mode: str) -> None:
     std_sleep = df["sleep_hours"].std()
 
     min_row = df.loc[df["sleep_hours"].idxmin()]
-    max_row = df.loc[df["sleep_hours"].idxmax()]
 
     col1, col2, col3 = st.columns(3)
     col1.metric("Tracked nights", total_nights, help="How many nights are in this export")
@@ -70,7 +69,7 @@ def highlight_metrics(df: pd.DataFrame, mode: str) -> None:
         f"Shortest night: **{min_row.sleep_hours:0.2f} h** on {min_row.date.date()}"
     )
     col5.write(
-        f"Longest night: **{max_row.sleep_hours:0.2f} h** on {max_row.date.date()}"
+        f"Median night: **{median_sleep:0.2f} h** — use it as your baseline target"
     )
 
     sub5 = (df["sleep_hours"] < 5).sum()
