@@ -1,0 +1,3 @@
+sleep_id,user_id,bedtime_start,bedtime_end,duration_min,efficiency,is_long_nap,timezone
+oura_1,user123,2024-01-01T22:45:00-08:00,2024-01-02T06:30:00-08:00,465,0.9,False,America/Los_Angeles
+oura_2,user123,2024-01-02T23:15:00-08:00,2024-01-03T06:50:00-08:00,455,0.88,False,America/Los_Angeles

@@ -1,0 +1,3 @@
+uuid,user_id,start_date,end_date,duration_min,efficiency,nap,timezone
+apple_1,user123,2024-01-01T22:30:00-08:00,2024-01-02T06:20:00-08:00,470,0.86,False,America/Los_Angeles
+apple_2,user123,2024-01-02T23:05:00-08:00,2024-01-03T06:10:00-08:00,425,0.82,False,America/Los_Angeles
