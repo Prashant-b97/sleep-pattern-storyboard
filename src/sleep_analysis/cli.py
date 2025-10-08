@@ -29,6 +29,7 @@ except ImportError:  # pragma: no cover
 
 from .parsers import parse_apple_health, parse_fitbit, parse_oura
 from .transform import normalize, validate_records, write_curated_dataset
+from .training import run_training
 
 sns.set_theme(style="whitegrid")
 
@@ -46,7 +47,7 @@ class RunConfig:
     seasonal_period: int
 
 
-COMMAND_ALIASES = {"analyze", "ingest"}
+COMMAND_ALIASES = {"analyze", "ingest", "train"}
 
 
 def _configure_analyze_parser(parser: argparse.ArgumentParser) -> None:
@@ -135,6 +136,28 @@ def build_parser() -> argparse.ArgumentParser:
         help="Enable debug logging for ingest",
     )
     ingest_parser.set_defaults(command="ingest")
+
+    train_parser = subparsers.add_parser(
+        "train",
+        help="Train analytics v2 models using the provided config",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    train_parser.add_argument(
+        "--config",
+        required=True,
+        help="Path to analytics v2 YAML configuration",
+    )
+    train_parser.add_argument(
+        "--output-dir",
+        default=None,
+        help="Override report output directory",
+    )
+    train_parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Enable verbose logging for training",
+    )
+    train_parser.set_defaults(command="train")
 
     return parser
 
@@ -547,10 +570,25 @@ def run_ingest(args: argparse.Namespace) -> Path:
     return result.out_path
 
 
+def run_train(args: argparse.Namespace) -> Path:
+    configure_logging(args.verbose)
+    config_path = Path(args.config)
+    output_override = Path(args.output_dir) if args.output_dir else None
+    artifacts = run_training(config_path, output_dir_override=output_override)
+    if artifacts:
+        summary_dir = Path(args.output_dir) if args.output_dir else Path(artifacts[0].forecast_path).parent
+        logging.info("Training completed, produced %d artefacts.", len(artifacts))
+        return summary_dir
+    logging.warning("No artefacts generated during training run.")
+    return Path(args.output_dir or ".")
+
+
 def main(args: Optional[list[str]] = None) -> Path:
     namespace = parse_args(args=args)
     if namespace.command == "ingest":
         return run_ingest(namespace)
+    if namespace.command == "train":
+        return run_train(namespace)
     return run_analysis(namespace)
 
 
