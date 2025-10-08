@@ -8,18 +8,23 @@ version = "0.1.0"
 description = "CLI toolkit for exploring and forecasting personal sleep patterns"
 authors = [{ name = "Prashant Bhardwaj" }]
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.8"
 dependencies = [
-    "matplotlib>=3.8",
+    "matplotlib>=3.7",
     "pandas>=2.0",
     "seaborn>=0.12",
     "statsmodels>=0.14",
+    "pydantic>=2.6",
+    "pyarrow>=12.0",
+    "scipy>=1.10",
+    "backports.zoneinfo>=0.2.1; python_version<'3.9'",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
     "ruff>=0.5",
+    "hypothesis>=6.0",
 ]
 
 [project.scripts]

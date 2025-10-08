@@ -12,6 +12,7 @@ __pycache__/
 
 # Analysis artefacts
 analysis_output/
+.hypothesis/
 
 # Data folders
 data/processed/

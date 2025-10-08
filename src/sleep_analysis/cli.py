@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import sys
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -26,10 +27,13 @@ except ImportError:  # pragma: no cover
     AutoReg = None
     seasonal_decompose = None
 
+from .parsers import parse_apple_health, parse_fitbit, parse_oura
+from .transform import normalize, validate_records, write_curated_dataset
+
 sns.set_theme(style="whitegrid")
 
 
-@dataclass(slots=True)
+@dataclass
 class RunConfig:
     primary_path: Path
     secondary_path: Optional[Path]
@@ -42,8 +46,10 @@ class RunConfig:
     seasonal_period: int
 
 
-def parse_args(args: Optional[list[str]] = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Explore sleep patterns from CSV exports.")
+COMMAND_ALIASES = {"analyze", "ingest"}
+
+
+def _configure_analyze_parser(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--primary",
         default="data/raw/sleep_data.csv",
@@ -88,6 +94,64 @@ def parse_args(args: Optional[list[str]] = None) -> argparse.Namespace:
         help="Skip secondary dataset processing even if the file exists",
     )
     parser.add_argument("--verbose", action="store_true", help="Enable debug logging")
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Sleep Pattern Storyboard CLI")
+    subparsers = parser.add_subparsers(dest="command")
+
+    analyze_parser = subparsers.add_parser(
+        "analyze",
+        help="Run exploratory analysis from Act I",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    _configure_analyze_parser(analyze_parser)
+    analyze_parser.set_defaults(command="analyze")
+
+    ingest_parser = subparsers.add_parser(
+        "ingest",
+        help="Ingest vendor CSVs into the curated parquet store",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    ingest_parser.add_argument(
+        "--source",
+        required=True,
+        choices=["oura", "fitbit", "apple_health"],
+        help="Vendor source identifier",
+    )
+    ingest_parser.add_argument(
+        "--path",
+        required=True,
+        help="Path to raw CSV file",
+    )
+    ingest_parser.add_argument(
+        "--out",
+        default="data/processed/parquet",
+        help="Directory where curated parquet partitions are written",
+    )
+    ingest_parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Enable debug logging for ingest",
+    )
+    ingest_parser.set_defaults(command="ingest")
+
+    return parser
+
+
+def parse_args(args: Optional[list[str]] = None) -> argparse.Namespace:
+    if args is None:
+        args = sys.argv[1:]
+    parser = build_parser()
+    if args and args[0] in {"-h", "--help"}:
+        return parser.parse_args(args=args)
+    if not args:
+        args = ["analyze"]
+    elif args[0] not in COMMAND_ALIASES:
+        if args[0].startswith("-"):
+            args = ["analyze", *args]
+        else:
+            args = ["analyze", *args]
     return parser.parse_args(args=args)
 
 
@@ -463,8 +527,30 @@ def run_analysis(args: argparse.Namespace) -> Path:
     return config.run_dir
 
 
+def run_ingest(args: argparse.Namespace) -> Path:
+    configure_logging(args.verbose)
+    parser_map = {
+        "oura": parse_oura,
+        "fitbit": parse_fitbit,
+        "apple_health": parse_apple_health,
+    }
+    parser_fn = parser_map[args.source]
+    logging.info("Parsing %s export from %s", args.source, args.path)
+    raw_df = parser_fn(args.path)
+    if raw_df.empty:
+        logging.warning("No rows detected in input %s", args.path)
+    normalized = normalize(raw_df)
+    validate_records(normalized)
+    result = write_curated_dataset(normalized, Path(args.out))
+    logging.info("Wrote %d rows to %s", len(normalized), result.out_path)
+    logging.info("Version pointer updated at %s", result.version_pointer)
+    return result.out_path
+
+
 def main(args: Optional[list[str]] = None) -> Path:
     namespace = parse_args(args=args)
+    if namespace.command == "ingest":
+        return run_ingest(namespace)
     return run_analysis(namespace)
 
 
