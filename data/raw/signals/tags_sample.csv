@@ -1,0 +1,3 @@
+user_id,date,caffeine,alcohol,late_meal,work_travel
+user123,2024-01-02,true,false,false,false
+user123,2024-01-03,false,false,false,false

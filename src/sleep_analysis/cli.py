@@ -30,6 +30,7 @@ except ImportError:  # pragma: no cover
 from .parsers import parse_apple_health, parse_fitbit, parse_oura
 from .transform import normalize, validate_records, write_curated_dataset
 from .training import run_training
+from .features.health_store import build_health_feature_store
 
 sns.set_theme(style="whitegrid")
 
@@ -47,7 +48,7 @@ class RunConfig:
     seasonal_period: int
 
 
-COMMAND_ALIASES = {"analyze", "ingest", "train"}
+COMMAND_ALIASES = {"analyze", "ingest", "train", "build-features"}
 
 
 def _configure_analyze_parser(parser: argparse.ArgumentParser) -> None:
@@ -136,6 +137,37 @@ def build_parser() -> argparse.ArgumentParser:
         help="Enable debug logging for ingest",
     )
     ingest_parser.set_defaults(command="ingest")
+
+    features_parser = subparsers.add_parser(
+        "build-features",
+        help="Fuse health signals into a feature store parquet",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    features_parser.add_argument(
+        "--parquet-dir",
+        default="data/processed/parquet",
+        help="Directory containing curated sleep parquet partitions",
+    )
+    features_parser.add_argument("--hrv", default=None, help="Path to HRV CSV export")
+    features_parser.add_argument("--steps", default=None, help="Path to steps CSV export")
+    features_parser.add_argument("--tags", default=None, help="Path to manual tags CSV")
+    features_parser.add_argument(
+        "--screen-time",
+        dest="screen_time",
+        default=None,
+        help="Path to screen-time proxy CSV",
+    )
+    features_parser.add_argument(
+        "--out",
+        required=True,
+        help="Directory where feature store parquet files are written",
+    )
+    features_parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Enable verbose logging for feature building",
+    )
+    features_parser.set_defaults(command="build-features")
 
     train_parser = subparsers.add_parser(
         "train",
@@ -570,6 +602,22 @@ def run_ingest(args: argparse.Namespace) -> Path:
     return result.out_path
 
 
+def run_build_features(args: argparse.Namespace) -> Path:
+    configure_logging(args.verbose)
+    parquet_dir = Path(args.parquet_dir)
+    output_dir = Path(args.out)
+    feature_path = build_health_feature_store(
+        parquet_dir,
+        hrv_path=Path(args.hrv) if args.hrv else None,
+        steps_path=Path(args.steps) if args.steps else None,
+        tags_path=Path(args.tags) if args.tags else None,
+        screen_time_path=Path(args.screen_time) if args.screen_time else None,
+        output_dir=output_dir,
+    )
+    logging.info("Feature store written to %s", feature_path)
+    return feature_path
+
+
 def run_train(args: argparse.Namespace) -> Path:
     configure_logging(args.verbose)
     config_path = Path(args.config)
@@ -589,6 +637,8 @@ def main(args: Optional[list[str]] = None) -> Path:
         return run_ingest(namespace)
     if namespace.command == "train":
         return run_train(namespace)
+    if namespace.command == "build-features":
+        return run_build_features(namespace)
     return run_analysis(namespace)
 
 

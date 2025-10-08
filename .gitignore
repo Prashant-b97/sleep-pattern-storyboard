@@ -21,6 +21,7 @@ data/processed/
 # Ignore stray CSVs but keep sample raw data
 *.csv
 !data/raw/*.csv
+!data/raw/signals/*.csv
 
 # Streamlit static files
 .streamlit/

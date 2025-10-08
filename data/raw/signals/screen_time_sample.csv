@@ -1,0 +1,3 @@
+user_id,date,late_minutes,total_events
+user123,2024-01-02,25,3
+user123,2024-01-03,0,1

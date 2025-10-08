@@ -1,0 +1,3 @@
+user_id,date,rmssd,sdnn,baseline_rmssd
+user123,2024-01-02,72,90,70
+user123,2024-01-03,74,92,70
